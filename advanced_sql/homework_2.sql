@@ -6,7 +6,8 @@
 SELECT
 	alamat.kota,
 	alamat.alamat,
-	COUNT(orders.id_order) AS total_order
+	SUM(orders.harga) AS total_order,
+	COUNT(orders.id_order) AS jumlah_transaksi -- untuk menghindari miss komunikasi
 FROM rakamin_order AS orders
 LEFT JOIN rakamin_customer_address AS alamat ON orders.id_pelanggan = alamat.id_pelanggan
 WHERE alamat.kota != 'Depok'
@@ -21,14 +22,15 @@ ORDER BY total_order DESC
 SELECT
 	customer.id_pelanggan,
 	customer.telepon,
-	customer.email, -- supaya user tahu kalau email benar-benar @yahoo.com
+	customer.email, -- supaya user tahu kalau email benar-benar @yahoo.com :)
 	orders.metode_bayar,
-	SUM(orders.kuantitas * orders.harga * (1+ppn)) AS total_payment_value
+	SUM(orders.kuantitas * orders.harga) AS total_payment_value
 FROM rakamin_order AS orders
 LEFT JOIN rakamin_customer AS customer ON orders.id_pelanggan = customer.id_pelanggan
+-- LEFT JOIN pada rakamin_order digunakan untuk mendapatkan hanya customer yang pernah order
 WHERE customer.email LIKE '%@yahoo.com' AND customer.penipu = 0
 GROUP BY customer.id_pelanggan, customer.telepon, customer.email, orders.metode_bayar
-ORDER BY customer.id_pelanggan
+ORDER BY metode_bayar
 
 -- Soal 3
 -- Tim UX researcher ingin mengetahui alasan dari 
@@ -50,16 +52,17 @@ FROM
 	LEFT JOIN rakamin_customer AS customer ON orders.id_pelanggan = customer.id_pelanggan
 	LEFT JOIN rakamin_customer_address AS alamat on customer.id_pelanggan = alamat.id_pelanggan
 WHERE
--- sub query untuk filter customer yang tidak pernah cashless sama sekali
+-- Sub-query untuk filter customer yang tidak pernah cashless sama sekali
 	customer.id_pelanggan NOT IN (
 		SELECT id_pelanggan
 		FROM rakamin_order
 		WHERE metode_bayar != 'cash'
-	)
+	) -- kumpulkan id pelanggan yang pernah bayar cashless, lalu filter supaya id tsb tidak dipakai (NOT IN)
 	AND customer.konfirmasi_telepon = 1
 	AND customer.penipu = 0
 	AND customer.pengguna_aktif = 1
 GROUP BY customer.nama, customer.email, customer.telepon, alamat.alamat, orders.metode_bayar
+ORDER BY jumlah_order_cash DESC
 
 -- Soal 4
 -- Salah satu tantangan bisnis yang sedang dihadapi oleh RakaFood adalah untuk 
@@ -71,18 +74,57 @@ GROUP BY customer.nama, customer.email, customer.telepon, alamat.alamat, orders.
 -- bisa membantu menyelesaikan business problem tersebut, 
 -- yaitu untuk meningkatkan digital payment di transaksi RakaFood!
 SELECT
-	alamat.kota,
-	CASE 
-		WHEN orders.metode_bayar = 'cash' THEN 'cash'
-		ELSE 'cashless' 
-	END AS cash_or_cashless,
-	COUNT(DISTINCT orders.id_pelanggan) AS pelanggan_unik,
-	SUM(kuantitas * harga) AS total_value
-FROM rakamin_order AS orders
-LEFT JOIN rakamin_customer AS customer ON orders.id_pelanggan = customer.id_pelanggan
-LEFT JOIN rakamin_customer_address AS alamat ON customer.id_pelanggan = alamat.id_pelanggan
-GROUP BY 1,2
-ORDER BY 1,2
+	cust.nama,
+	cust.email,
+-- c. Tambahkan juga informasi alamat setiap pelanggan.
+	alamat.alamat,
+-- b. Kemudian, gunakan fungsi agregasi yang tepat untuk menghitung jumlah pesanan
+-- Query di bawah juga sebagai pengelompokkan berdasarkan metode bayar (cash or cashless)
+	COUNT(CASE WHEN ro.metode_bayar = 'cash' THEN ro.id_order END) AS transaksi_cash, 
+	SUM(CASE WHEN ro.metode_bayar = 'cash' THEN ro.kuantitas * ro.harga ELSE 0 END) AS jumlah_pesanan_cash,
+	COUNT(CASE WHEN ro.metode_bayar != 'cash' THEN ro.id_order END) AS transaksi_cashless,
+	SUM(CASE WHEN ro.metode_bayar != 'cash' THEN ro.kuantitas * ro.harga ELSE 0 END) AS jumlah_pesanan_cashless
+FROM
+-- a. Gabungkan Tabel rakamin_customer dan rakamin_order
+	rakamin_customer AS cust
+	LEFT JOIN rakamin_order AS ro ON cust.id_pelanggan = ro.id_pelanggan
+	RIGHT JOIN rakamin_customer_address AS alamat ON cust.id_pelanggan = alamat.id_pelanggan
+-- kelompokkan berdasarkan nama pelanggan, email (metode bayar dikelompokkan sebagai kolom, query ada di atas)
+GROUP BY cust.nama, cust.email, alamat.alamat
+ORDER BY transaksi_cashless ASC, transaksi_cash ASC, jumlah_pesanan_cash DESC
+	
+
+/*
+PENJELASAN CODE:
+Query di atas akan menampilkan nama customer, email, alamat customer, jumlah & TPV transaksi cash atau cashless.
+Pengelompokkan LEFT JOIN pada rakamin cust digunakan supaya customer yang belum pernah order juga masuk dalam
+tabel, sedangkan RIGHT JOIN pada rakamin cust address digunakan untuk hanya menampilkan customer yang data 
+alamatnya lengkap, sehingga mudah dihubungi apabila dibutuhkan untuk keperluan KYC.
+
+Data di-order (ASC) berdasarkan transaksi cashless dan transaksi cash, supaya customer dengan jumlah transaksi 
+paling sedikit berada di baris atas (prioritas). Di-order juga berdasarkan TPV transaksi cash (DESC) untuk 
+mendapatkan customer yang jumlah transaksi cashnya lebih besar dibandingkan cashless.
+
+PENJELASAN SOLUSI:
+1. Solusi untuk meningkatkan penggunaan dompet digital dapat berupa memberikan promo pembayaran dompet digital.
+Promo ditujukan bagi pengguna baru yang belum pernah order sama sekali, maupun pengguna yang hanya menggunakan
+cash (Row 1-45 dalam query).
+
+2. Solusi lainnya dapat berupa melakukan survey terhadap pengguna yang transaksi cashnya lebih besar dibandingkan
+transaksi cashless. Customer potensial = row 22-45, row 76-78, row 67-69. Survey digunakan untuk mencari tahu 
+alasan pengguna tersebut lebih memilih menggunakan transaksi cash dibandingkan cashless. Survey dapat dikirimkan 
+melalui email / aplikasi RakaFood dengan insentif berupa undian untuk mendapatkan saldo e-money.
+
+3. Solusi lainnya bisa berupa program referral bagi customer yang telah nyaman menggunakan dompet digital. 
+Customer yang potensial, seperti customer pada row 79-85, 71-75, 46-66. Customer yang telah nyaman dapat 
+memberikan ulasan yang baik terhadap dompet digital, sehingga program referral sesuai untuk dijalankan pada 
+customer tersebut.
+
+ALTERNATIF:
+EDA: 		https://docs.google.com/presentation/d/1B8L376tjMxNuFzaA6Gr6E0jk_wW0MN_FSFi8Mysigl8/edit?usp=sharing
+Alternatif: https://www.codepile.net/pile/oAgd5La1
+*/
+
 
 -- Soal 5
 -- Tim customer experience (CX) ingin mengoptimalkan penggunaan dompet digital dan 
@@ -95,31 +137,38 @@ ORDER BY 1,2
 -- c. Total poin 100 - 300 adalah silver member 
 -- d. Total poin lebih dari 300 adalah gold member 
 -- Tim CX membutuhkan data jumlah pelanggan di setiap kota berdasarkan kategori membershipnya.
+
 WITH rakamin_poin AS (
 	SELECT
 		id_pelanggan,
 		total_belanja,
-		FLOOR(total_belanja / 1000) AS total_poin
+		total_poin,
+		CASE
+			WHEN total_poin BETWEEN 10 AND 100 THEN 'bronze member'
+			WHEN total_poin BETWEEN 101 AND 300 THEN 'silver member' 
+			WHEN total_poin > 300 THEN 'gold member'
+			ELSE 'non-member'
+		END AS membership_category
 	FROM (
 		SELECT
 			id_pelanggan,
-			SUM(kuantitas * harga * (1+ppn)) AS total_belanja
+			SUM(CASE WHEN metode_bayar != 'cash' THEN kuantitas * harga ELSE 0 END) AS total_belanja,
+			FLOOR(SUM(CASE WHEN metode_bayar != 'cash' THEN kuantitas * harga ELSE 0 END)/1000) AS total_poin
+		-- query di atas untuk menghitung total bayar tiap user yang cashless, kalau pakai cash dihitung 0
+		-- floor pada perhitungan poin digunakan karena minimal 1000 untuk 1 poin, sehingga 999 tidak termasuk.
 		FROM rakamin_order 
-		WHERE metode_bayar != 'cash'
 		GROUP BY id_pelanggan
+		ORDER BY id_pelanggan
 	) AS poin_agg
 )
 SELECT
 	alamat.kota,
-	CASE
-		WHEN membership.total_poin < 10 THEN '0_non-member'
-		WHEN membership.total_poin BETWEEN 10 AND 100 THEN '1_bronze member'
-		WHEN membership.total_poin BETWEEN 101 AND 300 THEN '2_silver member' 
-		WHEN membership.total_poin > 300 THEN '3_gold member'
-	END AS membership_category,
-	COUNT(membership.id_pelanggan) AS jumlah_member
+	COUNT(CASE WHEN membership_category = 'non-member' THEN 1 END) AS non_member,
+	COUNT(CASE WHEN membership_category = 'bronze member' THEN 1 END) AS bronze_member,
+	COUNT(CASE WHEN membership_category = 'silver member' THEN 1 END) AS silver_member,
+	COUNT(CASE WHEN membership_category = 'gold member' THEN 1 END) AS gold_member
 FROM
-	rakamin_customer_address AS alamat
-	RIGHT JOIN rakamin_poin AS membership ON alamat.id_pelanggan = membership.id_pelanggan
-GROUP BY alamat.kota, membership_category
-ORDER BY alamat.kota, membership_category
+	rakamin_poin AS membership
+	LEFT JOIN rakamin_customer_address AS alamat ON membership.id_pelanggan = alamat.id_pelanggan
+GROUP BY alamat.kota
+ORDER BY alamat.kota
