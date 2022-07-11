@@ -1,1 +1,1 @@
-# rakamin-sql
+# Kumpulan project dari bootcamp rakamin
