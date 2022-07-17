@@ -1,4 +1,4 @@
-# Kumpulan project dari bootcamp rakamin
+# Kumpulan Project dari Bootcamp Rakamin DS Batch 23 (Almas)
 
 ## SQL
 1. [SQL Basic](https://github.com/Alrafikri/rakamin/tree/main/basic_sql)
