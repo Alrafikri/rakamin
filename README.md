@@ -9,4 +9,4 @@
 2. [Basic Python CP Fundamental](https://github.com/Alrafikri/rakamin/blob/main/python_programming_basic/Almas%20Rausan%20Fikri_Batch_23.ipynb)
     * [RFM Analysis Function](https://github.com/Alrafikri/rakamin/blob/main/python_programming_basic/soal_8/rfm_analysis.py)
 3. [Basic Data Preprocessing](https://github.com/Alrafikri/rakamin/blob/main/python_dataprocessing_basic/homework.ipynb)
-4. []()
+4. [Data Visualization](https://github.com/Alrafikri/rakamin/blob/main/dataviz/homework.ipynb)
