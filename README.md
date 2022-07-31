@@ -10,3 +10,4 @@
     * [RFM Analysis Function](https://github.com/Alrafikri/rakamin/blob/main/python_programming_basic/soal_8/rfm_analysis.py)
 3. [Basic Data Preprocessing](https://github.com/Alrafikri/rakamin/blob/main/python_dataprocessing_basic/homework.ipynb)
 4. [Data Visualization](https://github.com/Alrafikri/rakamin/blob/main/dataviz/homework.ipynb)
+5. [Statistics](https://github.com/Alrafikri/rakamin/blob/main/stats/almashw.ipynb)
